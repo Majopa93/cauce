@@ -165,7 +165,7 @@ let D,MES,TAB="sala",VIEW="conteo";
 /* ===== CONEXIÓN CON DRIVE =====
    Pega entre las comillas el enlace /exec de tu Apps Script (el de "Implementar").
    Si lo dejas vacío, la app funciona igual pero guarda solo en este navegador. */
-const GAS_URL="";
+const GAS_URL="https://script.google.com/macros/s/AKfycbzefFaIKrsnukjKvZbrMALaZ022DJpdiFZJ4OaY3EAPTajhUdIzDUN7IPZEYsEtSowO/exec";
 const HASBK=!!GAS_URL;
 function gasGet(cb){if(!GAS_URL){cb(null);return;}var fn="__cb"+Math.floor(Math.random()*1e9);var s=document.createElement("script");
   window[fn]=function(d){try{cb(d);}finally{delete window[fn];if(s.parentNode)s.parentNode.removeChild(s);}};
