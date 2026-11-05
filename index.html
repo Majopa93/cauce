@@ -33,6 +33,8 @@ h1,h2,h3,h4{font-family:"Bricolage Grotesque","IBM Plex Sans",sans-serif;font-we
 .savebtn.show{display:inline-block}
 .savebtn.dirty{box-shadow:0 0 0 3px var(--brand-050);animation:pulseg 1.6s ease-in-out infinite}
 @keyframes pulseg{0%,100%{box-shadow:0 0 0 3px var(--brand-050)}50%{box-shadow:0 0 0 6px var(--brand-050)}}
+.pullbtn{display:none;background:var(--brand-050);color:var(--brand-ink);border:none;font:inherit;font-weight:600;font-size:13px;padding:8px 13px;border-radius:999px;cursor:pointer}
+.pullbtn.show{display:inline-block}.pullbtn:hover{background:var(--teal-100)}
 .syncp{font-size:12px;font-weight:600;color:var(--ink-faint);white-space:nowrap}
 .syncp.ok{color:var(--ok)}.syncp.save{color:var(--amber)}.syncp.err{color:var(--red)}
 .syncp.ok::before,.syncp.save::before,.syncp.err::before{content:"\25cf  "}
@@ -149,6 +151,7 @@ table.sala{width:100%;border-collapse:collapse}
   <span class="sp"></span>
   <div class="msel"><span class="dot"></span><select id="msel" onchange="setMes(this.value)"></select></div>
   <button class="addm" onclick="addMes()">+ Mes</button>
+  <button class="pullbtn" id="pullbtn" onclick="pullFromDrive(false)" title="Traer lo último del Drive">Traer del Drive</button>
   <button class="savebtn" id="savebtn" onclick="saveToDrive()">Guardar en Drive</button>
   <span class="syncp" id="sync"></span>
 </div>
@@ -172,9 +175,9 @@ let D,MES,TAB="sala",VIEW="conteo";
    Si lo dejas vacío, la app funciona igual pero guarda solo en este navegador. */
 const GAS_URL="https://script.google.com/macros/s/AKfycbzefFaIKrsnukjKvZbrMALaZ022DJpdiFZJ4OaY3EAPTajhUdIzDUN7IPZEYsEtSowO/exec";
 const HASBK=!!GAS_URL;
-function gasGet(cb){if(!GAS_URL){cb(null);return;}var fn="__cb"+Math.floor(Math.random()*1e9);var s=document.createElement("script");
-  window[fn]=function(d){try{cb(d);}finally{delete window[fn];if(s.parentNode)s.parentNode.removeChild(s);}};
-  s.onerror=function(){delete window[fn];if(s.parentNode)s.parentNode.removeChild(s);cb(null);};
+function gasGet(cb){if(!GAS_URL){cb(null);return;}var done=false,fn="__cb"+Math.floor(Math.random()*1e9),s=document.createElement("script");
+  function fin(d){if(done)return;done=true;try{cb(d);}finally{try{delete window[fn];}catch(e){}if(s.parentNode)s.parentNode.removeChild(s);}}
+  window[fn]=function(d){fin(d);};s.onerror=function(){fin(null);};setTimeout(function(){fin(null);},12000);
   s.src=GAS_URL+(GAS_URL.indexOf("?")>=0?"&":"?")+"action=get&callback="+fn+"&t="+Date.now();document.body.appendChild(s);}
 function gasSave(m,label,month){return fetch(GAS_URL,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},
   body:JSON.stringify({action:"save",monthKey:m,label:label,month:month})});}
@@ -187,11 +190,12 @@ function saveNext(keys,i){if(i>=keys.length){_saving=false;setSync("ok");return;
   gasSave(m,D.months[m].label,D.months[m]).then(function(){delete _dirty[m];saveNext(keys,i+1);})
     .catch(function(){_saving=false;setSync("err");});}
 function pushAll(){markDirty();}
-function setSync(st){var e=document.getElementById("sync"),bt=document.getElementById("savebtn");
+function setSync(st){var e=document.getElementById("sync"),bt=document.getElementById("savebtn"),pb=document.getElementById("pullbtn");
   if(bt)bt.className="savebtn"+(HASBK?" show":"")+(st==="dirty"?" dirty":"");
+  if(pb)pb.className="pullbtn"+(HASBK?" show":"");
   if(!e)return;if(!HASBK){e.textContent="";e.className="syncp";return;}
-  e.className="syncp "+(st==="dirty"?"save":st);
-  e.textContent=st==="ok"?"Guardado en Drive":st==="save"?"Guardando\u2026":st==="err"?"Error al guardar \u00b7 reintenta":st==="dirty"?"Cambios sin guardar":"";}
+  var map={ok:"Guardado en Drive",save:"Guardando\u2026",sync:"Sincronizando\u2026",err:"Error \u00b7 reintenta",dirty:"Cambios sin guardar",idle:""};
+  e.className="syncp "+(st==="dirty"||st==="sync"?"save":(st==="idle"?"":st));e.textContent=map[st]||"";}
 function initMES(){MES=(D.order&&D.order.indexOf("2026-06")>=0)?"2026-06":D.order[0];}
 
 const money=n=>"$"+Math.round(n).toLocaleString("es-EC");
@@ -390,13 +394,13 @@ function toast(msg){let t=document.getElementById("toast");
 
 function startApp(){
   loadLocal();initMES();render();
-  if(HASBK){setSync("save");
-    gasGet(function(d){
-      if(d===null){setSync("err");return;}
-      if(d.order&&d.order.length){D=d;initMES();render();setSync("ok");}
-      else{D.order.forEach(function(k){_dirty[k]=true;});setSync("dirty");}
-    });
-  }
+  var hasLocal=false;try{hasLocal=!!localStorage.getItem(LSKEY);}catch(e){}
+  if(HASBK&&!hasLocal){pullFromDrive(true);}else{setSync("idle");}
 }
+function pullFromDrive(silent){if(!HASBK)return;setSync("sync");
+  gasGet(function(d){
+    if(d&&d.order&&d.order.length){D=d;initMES();render();_dirty={};setSync("ok");}
+    else{setSync(silent?"idle":"err");}
+  });}
 startApp();
 </script></body></html>
