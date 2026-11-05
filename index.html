@@ -29,6 +29,10 @@ h1,h2,h3,h4{font-family:"Bricolage Grotesque","IBM Plex Sans",sans-serif;font-we
 .msel select{border:none;background:none;font:inherit;font-weight:600;color:var(--ink);outline:none;cursor:pointer}
 .addm{background:var(--brand-050);color:var(--brand-ink);border:none;font:inherit;font-weight:600;font-size:13px;padding:8px 13px;border-radius:999px;cursor:pointer}
 .addm:hover{background:var(--teal-100)}
+.savebtn{display:none;background:var(--grad);color:#083540;border:none;font:inherit;font-weight:700;font-size:13px;padding:8px 15px;border-radius:999px;cursor:pointer}
+.savebtn.show{display:inline-block}
+.savebtn.dirty{box-shadow:0 0 0 3px var(--brand-050);animation:pulseg 1.6s ease-in-out infinite}
+@keyframes pulseg{0%,100%{box-shadow:0 0 0 3px var(--brand-050)}50%{box-shadow:0 0 0 6px var(--brand-050)}}
 .syncp{font-size:12px;font-weight:600;color:var(--ink-faint);white-space:nowrap}
 .syncp.ok{color:var(--ok)}.syncp.save{color:var(--amber)}.syncp.err{color:var(--red)}
 .syncp.ok::before,.syncp.save::before,.syncp.err::before{content:"\25cf  "}
@@ -145,6 +149,7 @@ table.sala{width:100%;border-collapse:collapse}
   <span class="sp"></span>
   <div class="msel"><span class="dot"></span><select id="msel" onchange="setMes(this.value)"></select></div>
   <button class="addm" onclick="addMes()">+ Mes</button>
+  <button class="savebtn" id="savebtn" onclick="saveToDrive()">Guardar en Drive</button>
   <span class="syncp" id="sync"></span>
 </div>
 <div class="wrap">
@@ -174,15 +179,19 @@ function gasGet(cb){if(!GAS_URL){cb(null);return;}var fn="__cb"+Math.floor(Math.
 function gasSave(m,label,month){return fetch(GAS_URL,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},
   body:JSON.stringify({action:"save",monthKey:m,label:label,month:month})});}
 function loadLocal(){try{const s=localStorage.getItem(LSKEY);D=s?JSON.parse(s):JSON.parse(JSON.stringify(SEED));}catch(e){D=JSON.parse(JSON.stringify(SEED));}}
-function save(){try{localStorage.setItem(LSKEY,JSON.stringify(D));}catch(e){}queueSync();}
-let _dirty={},_saving=false,_syncT;
-function queueSync(){if(!HASBK)return;_dirty[MES]=true;setSync("save");clearTimeout(_syncT);_syncT=setTimeout(flushSync,1000);}
-function flushSync(){if(!HASBK||_saving)return;var keys=Object.keys(_dirty);if(!keys.length)return;var m=keys[0];delete _dirty[m];_saving=true;
-  gasSave(m,D.months[m].label,D.months[m]).then(function(){_saving=false;if(Object.keys(_dirty).length){flushSync();}else{setSync("ok");}})
-    .catch(function(){_saving=false;_dirty[m]=true;setSync("err");clearTimeout(_syncT);_syncT=setTimeout(flushSync,2500);});}
-function pushAll(){if(!HASBK)return;D.order.forEach(function(k){_dirty[k]=true;});setSync("save");flushSync();}
-function setSync(st){const e=document.getElementById("sync");if(!e)return;if(!HASBK){e.textContent="";e.className="syncp";return;}
-  e.className="syncp "+st;e.textContent=st==="ok"?"Guardado en Drive":st==="save"?"Guardando\u2026":st==="err"?"Sin conexi\u00f3n \u00b7 guardado local":"";}
+function save(){try{localStorage.setItem(LSKEY,JSON.stringify(D));}catch(e){}markDirty();}
+let _dirty={},_saving=false;
+function markDirty(){if(!HASBK)return;_dirty[MES]=true;setSync("dirty");}
+function saveToDrive(){if(!HASBK||_saving)return;var keys=Object.keys(_dirty);if(!keys.length){setSync("ok");return;}_saving=true;setSync("save");saveNext(keys,0);}
+function saveNext(keys,i){if(i>=keys.length){_saving=false;setSync("ok");return;}var m=keys[i];
+  gasSave(m,D.months[m].label,D.months[m]).then(function(){delete _dirty[m];saveNext(keys,i+1);})
+    .catch(function(){_saving=false;setSync("err");});}
+function pushAll(){markDirty();}
+function setSync(st){var e=document.getElementById("sync"),bt=document.getElementById("savebtn");
+  if(bt)bt.className="savebtn"+(HASBK?" show":"")+(st==="dirty"?" dirty":"");
+  if(!e)return;if(!HASBK){e.textContent="";e.className="syncp";return;}
+  e.className="syncp "+(st==="dirty"?"save":st);
+  e.textContent=st==="ok"?"Guardado en Drive":st==="save"?"Guardando\u2026":st==="err"?"Error al guardar \u00b7 reintenta":st==="dirty"?"Cambios sin guardar":"";}
 function initMES(){MES=(D.order&&D.order.indexOf("2026-06")>=0)?"2026-06":D.order[0];}
 
 const money=n=>"$"+Math.round(n).toLocaleString("es-EC");
@@ -385,7 +394,7 @@ function startApp(){
     gasGet(function(d){
       if(d===null){setSync("err");return;}
       if(d.order&&d.order.length){D=d;initMES();render();setSync("ok");}
-      else{pushAll();}
+      else{D.order.forEach(function(k){_dirty[k]=true;});setSync("dirty");}
     });
   }
 }
