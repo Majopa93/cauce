@@ -35,6 +35,10 @@ h1,h2,h3,h4{font-family:"Bricolage Grotesque","IBM Plex Sans",sans-serif;font-we
 @keyframes pulseg{0%,100%{box-shadow:0 0 0 3px var(--brand-050)}50%{box-shadow:0 0 0 6px var(--brand-050)}}
 .pullbtn{display:none;background:var(--brand-050);color:var(--brand-ink);border:none;font:inherit;font-weight:600;font-size:13px;padding:8px 13px;border-radius:999px;cursor:pointer}
 .pullbtn.show{display:inline-block}.pullbtn:hover{background:var(--teal-100)}
+.tchips{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 12px}
+.chlbl{font-size:12px;font-weight:600;color:var(--ink-faint)}
+.chip{background:var(--card);border:1px solid var(--line);color:var(--ink-soft);font:inherit;font-weight:600;font-size:12.5px;padding:5px 12px;border-radius:999px;cursor:pointer}
+.chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
 .syncp{font-size:12px;font-weight:600;color:var(--ink-faint);white-space:nowrap}
 .syncp.ok{color:var(--ok)}.syncp.save{color:var(--amber)}.syncp.err{color:var(--red)}
 .syncp.ok::before,.syncp.save::before,.syncp.err::before{content:"\25cf  "}
@@ -52,6 +56,26 @@ h1,h2,h3,h4{font-family:"Bricolage Grotesque","IBM Plex Sans",sans-serif;font-we
 
 .totbar{position:sticky;top:66px;z-index:10;display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px}
 @media(max-width:860px){.totbar{grid-template-columns:repeat(2,1fr)}.top .tt{display:none}.top{padding:12px 14px;gap:12px}.wrap{padding:16px 12px 60px}}
+@media(max-width:720px){
+  .top{position:static}
+  .totbar{position:static;top:auto;grid-template-columns:repeat(2,1fr)}
+  .sala,.sala tbody{display:block}
+  .sala thead{display:none}
+  .sala tr{display:block;border:1px solid var(--line);border-radius:13px;margin:10px 0;padding:10px 13px 6px;position:relative;box-shadow:var(--shadow)}
+  .sala td{display:flex;align-items:center;justify-content:space-between;gap:12px;border:none;border-bottom:1px solid var(--line-soft);padding:8px 0}
+  .sala td:last-child{border-bottom:none}
+  .sala td::before{content:attr(data-l);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-faint)}
+  .sala td.hidem{display:flex}
+  .sala td.num{position:absolute;top:10px;right:13px;padding:0;border:none;color:var(--ink-faint);font-size:11px}
+  .sala td.num::before{content:""}
+  .sala td.nmcell{border-bottom:1px solid var(--line);padding:2px 46px 8px 0}
+  .sala td.nmcell::before{content:""}
+  .sala td.nmcell .nm{font-weight:700;font-size:15px;width:100%;border-color:transparent}
+  .sala td.delcell{justify-content:flex-end;padding-top:4px}
+  .sala td.delcell::before{content:""}
+  .sala td.delcell .delx{font-size:13px;color:var(--red)}
+  .stp input{width:40px}
+}
 .tcard{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:12px 14px;box-shadow:var(--shadow)}
 .tcard .k{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-faint);font-weight:600}
 .tcard .v{font-family:"Bricolage Grotesque";font-weight:700;font-size:23px;margin-top:2px}
@@ -241,28 +265,35 @@ function exBanner(){const x=D.months[MES];if(!x.ejemplo)return "";
     <div><b>Mes de ejemplo</b> — datos reales de junio. <b>Conteo</b>: anota el total de sesiones por paciente (rápido, para ponerse al día). <b>Día a día</b>: marca cada sesión en su fecha. Los filtros se suman solos en ambos.</div></div>`;}
 
 /* ---- CONTEO ---- */
+let turnoFiltro=0;
+function setTurnoFiltro(t){turnoFiltro=t;render();}
+function turnoChips(){return `<div class="tchips"><span class="chlbl">Turno:</span>`+[[0,"Todos"],[1,"1º"],[2,"2º"],[3,"3º"],[4,"4º"]].map(function(o){return `<button class="chip ${turnoFiltro===o[0]?"on":""}" onclick="setTurnoFiltro(${o[0]})">${o[1]}</button>`;}).join("")+`</div>`;}
+function turnoSel(i,p){return `<select class="fsel" onchange="setTurno(${i},this.value)">`+[1,2,3,4].map(function(t){return `<option value="${t}" ${(+p.turno||1)===t?"selected":""}>${t}º</option>`;}).join("")+`</select>`;}
+function setTurno(i,v){D.months[MES].pac[i].turno=+v;save();render();}
+function matchTurno(p){return !turnoFiltro||(+p.turno||1)===turnoFiltro;}
 function viewConteo(){const x=D.months[MES];
-  const rows=x.pac.map((p,i)=>{const s=sesOf(p),c=coagOf(p);return `<tr>
+  const rows=x.pac.map((p,i)=>({p:p,i:i})).filter(o=>matchTurno(o.p)).map(o=>{const p=o.p,i=o.i;const s=sesOf(p),c=coagOf(p);return `<tr id="row-${i}">
     <td class="num">${String(i+1).padStart(2,"0")}</td>
-    <td><input class="nm" value="${(p.n||"").replace(/"/g,"&quot;")}" onchange="setN(${i},this.value)"></td>
-    <td><span class="segtog"><button class="${p.seg==="IESS"?"on":""}" onclick="setSeg(${i},'IESS')">IESS</button><button class="${p.seg==="MSP"?"on":""}" onclick="setSeg(${i},'MSP')">MSP</button></span></td>
-    <td class="hidem"><span class="ptog"><button class="${p.patron==="LMV"?"on":""}" onclick="setPat(${i},'LMV')">L-M-V</button><button class="${p.patron==="MJS"?"on":""}" onclick="setPat(${i},'MJS')">M-J-S</button></span></td>
-    <td><select class="fsel" onchange="setF(${i},this.value)">${[17,18,19,20,21].map(f=>`<option value="${f}" ${+p.filtro===f?"selected":""}>${f}H</option>`).join("")}</select></td>
-    <td><span class="stp"><button onclick="bumpSes(${i},-1)">−</button><input type="number" min="0" value="${s}" onchange="setSesCount(${i},this.value)"><button onclick="bumpSes(${i},1)">+</button></span></td>
-    <td class="hidem"><span class="stp sm"><button onclick="bumpCoag(${i},-1)">−</button><input type="number" min="0" value="${c}" onchange="setCoagCount(${i},this.value)"><button onclick="bumpCoag(${i},1)">+</button></span></td>
-    <td class="fcell" id="sig-${i}">${s+c} <span class="coagf">${c?("+"+c+" coag"):""}</span></td>
-    <td><button class="delx" title="Quitar" onclick="delP(${i})">×</button></td></tr>`;}).join("");
-  return `${exBanner()}<div id="totbar"></div>
+    <td class="nmcell"><input class="nm" value="${(p.n||"").replace(/"/g,"&quot;")}" onchange="setN(${i},this.value)"></td>
+    <td data-l="Seguro"><span class="segtog"><button class="${p.seg==="IESS"?"on":""}" onclick="setSeg(${i},'IESS')">IESS</button><button class="${p.seg==="MSP"?"on":""}" onclick="setSeg(${i},'MSP')">MSP</button></span></td>
+    <td class="hidem" data-l="Patrón"><span class="ptog"><button class="${p.patron==="LMV"?"on":""}" onclick="setPat(${i},'LMV')">L-M-V</button><button class="${p.patron==="MJS"?"on":""}" onclick="setPat(${i},'MJS')">M-J-S</button></span></td>
+    <td class="hidem" data-l="Turno">${turnoSel(i,p)}</td>
+    <td data-l="Filtro"><select class="fsel" onchange="setF(${i},this.value)">${[17,18,19,20,21].map(f=>`<option value="${f}" ${+p.filtro===f?"selected":""}>${f}H</option>`).join("")}</select></td>
+    <td data-l="Sesiones"><span class="stp"><button onclick="bumpSes(${i},-1)">−</button><input type="number" min="0" value="${s}" onchange="setSesCount(${i},this.value)"><button onclick="bumpSes(${i},1)">+</button></span></td>
+    <td class="hidem" data-l="Coag."><span class="stp sm"><button onclick="bumpCoag(${i},-1)">−</button><input type="number" min="0" value="${c}" onchange="setCoagCount(${i},this.value)"><button onclick="bumpCoag(${i},1)">+</button></span></td>
+    <td class="fcell" data-l="Filtros" id="sig-${i}">${s+c} <span class="coagf">${c?("+"+c+" coag"):""}</span></td>
+    <td class="delcell"><button class="delx" title="Quitar" onclick="delP(${i})">×</button></td></tr>`;}).join("");
+  return `${exBanner()}<div id="totbar"></div>${turnoChips()}
     <div class="actions"><button class="btn-ghost" onclick="addP()">+ Paciente</button>
       <span class="hint">Escribe el total de <b>sesiones</b> de cada paciente; el filtro se cuenta por su tipo.</span></div>
     <div class="card"><table class="sala"><thead><tr>
-      <th>Nº</th><th>Paciente</th><th>Seguro</th><th class="hidem">Patrón</th><th>Filtro</th><th>Sesiones</th><th class="hidem">Coag.</th><th>Filtros</th><th></th>
+      <th>Nº</th><th>Paciente</th><th>Seguro</th><th class="hidem">Patrón</th><th class="hidem">Turno</th><th>Filtro</th><th>Sesiones</th><th class="hidem">Coag.</th><th>Filtros</th><th></th>
     </tr></thead><tbody id="salabody">${rows}</tbody></table></div>`;
 }
 
 /* ---- DÍA A DÍA ---- */
 function viewDia(){const x=D.months[MES];
-  const cards=x.pac.map((p,i)=>{const pd=patternDays(MES,p.patron);const s=sesOf(p),c=coagOf(p);
+  const cards=x.pac.map((p,i)=>({p:p,i:i})).filter(o=>matchTurno(o.p)).map(o=>{const p=o.p,i=o.i;const pd=patternDays(MES,p.patron);const s=sesOf(p),c=coagOf(p);
     const cells=pd.map(d=>{const v=p.dias[d.date];const cls=v?(v.c?"coag":"on"):"";
       return `<div class="dcell ${cls}" data-wl="${WLET[d.wd]}" title="${d.date}" onclick="tapDay(event,${i},'${d.date}')"><span class="dn">${d.d}</span><span class="dw">${v?v.f:WLET[d.wd]}</span></div>`;}).join("");
     return `<div class="pcard" id="pc-${i}"><div class="pc-head">
@@ -270,10 +301,11 @@ function viewDia(){const x=D.months[MES];
       <span class="badge ${p.seg==="IESS"?"i":"m"}">${p.seg}</span>
       <span class="pc-name">${p.n}</span>
       <span class="ptog"><button class="${p.patron==="LMV"?"on":""}" onclick="setPat(${i},'LMV')">L-M-V</button><button class="${p.patron==="MJS"?"on":""}" onclick="setPat(${i},'MJS')">M-J-S</button></span>
+      ${turnoSel(i,p)}
       <select class="fsel" onchange="setF(${i},this.value)">${[17,18,19,20,21].map(f=>`<option value="${f}" ${+p.filtro===f?"selected":""}>${f}H</option>`).join("")}</select>
       <span class="pc-sig" id="sig-${i}">${s+c} filtros</span></div>
       <div class="dstrip">${cells}</div></div>`;}).join("");
-  return `${exBanner()}<div id="totbar"></div>
+  return `${exBanner()}<div id="totbar"></div>${turnoChips()}
     <div class="actions"><button class="btn-ghost" onclick="addP()">+ Paciente</button>
       <span class="hint">Toca un día para marcar que dializó (filtro habitual). Tócalo otra vez para cambiar el filtro de esa sesión, marcar coágulo o quitar.</span></div>
     <div class="card">${cards}
@@ -338,8 +370,8 @@ function bumpCoag(i,delta){const p=D.months[MES].pac[i];const att=orderedPD(i).f
   if(delta>0){for(let k=att.length-1;k>=0;k--)if(p.dias[att[k]].c===0){p.dias[att[k]].c=1;break;}}
   else{for(let k=att.length-1;k>=0;k--)if(p.dias[att[k]].c===1){p.dias[att[k]].c=0;break;}}
   save();refreshRow(i);drawTot();}
-function refreshRow(i){const p=D.months[MES].pac[i];const s=sesOf(p),c=coagOf(p);const body=document.getElementById("salabody");
-  if(body&&body.rows[i]){const ins=body.rows[i].querySelectorAll("input[type=number]");if(ins[0])ins[0].value=s;if(ins[1])ins[1].value=c;}
+function refreshRow(i){const p=D.months[MES].pac[i];const s=sesOf(p),c=coagOf(p);var row=document.getElementById("row-"+i);
+  if(row){const ins=row.querySelectorAll("input[type=number]");if(ins[0])ins[0].value=s;if(ins[1])ins[1].value=c;}
   updSig(i);}
 function addP(){D.months[MES].pac.push({n:"Nuevo paciente",seg:"MSP",patron:"LMV",filtro:19,dias:{}});save();render();}
 function delP(i){const p=D.months[MES].pac[i];if(!confirm("¿Quitar a "+(p.n||"este paciente")+" de "+D.months[MES].label+"?"))return;
