@@ -425,9 +425,7 @@ function toast(msg){let t=document.getElementById("toast");
   t.textContent=msg;t.style.opacity="1";clearTimeout(window._tt);window._tt=setTimeout(()=>t.style.opacity="0",2600);}
 
 function startApp(){
-  loadLocal();initMES();render();
-  var hasLocal=false;try{hasLocal=!!localStorage.getItem(LSKEY);}catch(e){}
-  if(HASBK&&!hasLocal){pullFromDrive(true);}else{setSync("idle");}
+  loadLocal();initMES();render();setSync("idle");
 }
 function pullFromDrive(silent){if(!HASBK)return;setSync("sync");
   gasGet(function(d){
